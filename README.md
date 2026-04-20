@@ -54,6 +54,21 @@ docker compose up -d --build
 docker compose logs -f
 ```
 
+### One-shot VPS deploy
+
+```bash
+# On a fresh Ubuntu 22.04 / 24.04 VPS, as root:
+export REPO_URL="git@github.com:yourname/breaking-news-agent.git"
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/yourname/breaking-news-agent/main/scripts/deploy.sh)"
+```
+
+The script installs Docker, creates a non-root deploy user, hardens SSH, sets up
+UFW firewall, clones the repo, bootstraps `.env`, configures nightly backups, and
+starts the agent. Fully idempotent — safe to re-run.
+
+See [`docs/SECRETS.md`](docs/SECRETS.md) for secret-storage options
+(`.env` → SOPS → Doppler → Vault).
+
 ## Project layout
 
 ```
@@ -71,10 +86,13 @@ breaking-news-agent/
 │   └── analytics/           # metrics pullback
 ├── tests/                   # pytest unit tests
 ├── scripts/
+│   ├── deploy.sh            # one-shot VPS bootstrap
 │   ├── init_db.py
 │   └── send_daily_digest.py
 ├── docs/
-│   └── ARCHITECTURE.md
+│   ├── ARCHITECTURE.md
+│   ├── SETUP.md
+│   └── SECRETS.md
 ├── Dockerfile
 ├── docker-compose.yml
 └── requirements.txt
