@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "breaking-news-agent"
+version = "0.1.0"
+description = "AI agent that ingests breaking news and syndicates to X, Threads, Telegram, YouTube Shorts, and beehiiv."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Prince" }]
+requires-python = ">=3.11"
+
+[project.scripts]
+bna = "src.main:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
