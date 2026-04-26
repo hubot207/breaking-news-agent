@@ -25,16 +25,15 @@ will be extending the system.
                                                        ▼
                                               ┌──────────────────┐
                                               │  AI Rewriter     │
-                                              │  (1 call → 5 vars)│
+                                              │  (1 call → 4 vars)│
                                               └──────┬───────────┘
                                                      │
-                  ┌────────────┬──────────┬──────────┼──────────┬─────────────┐
-                  ▼            ▼          ▼          ▼          ▼             ▼
-             X adapter   Threads   Telegram   YouTube     beehiiv      (future)
-                                              Shorts
-                  │           │          │         │           │
-                  └─────┬─────┴──────┬───┴─────┬───┴─────┬─────┘
-                        │            │         │         │
+                       ┌────────────┬──────────┬─────┴──────┬─────────────┐
+                       ▼            ▼          ▼            ▼             ▼
+                  X adapter   Threads   Telegram   YouTube Shorts    (future)
+                       │           │          │         │
+                       └─────┬─────┴──────┬───┴─────┬───┘
+                             │            │         │
                         ▼            ▼         ▼         ▼
                 ┌─────────────────────────────────────────────┐
                 │              Posts table                    │
@@ -88,12 +87,11 @@ a system prompt that asks for a JSON object containing:
   "x": "<=270 char punchy tweet with link",
   "threads": "<=480 char conversational post",
   "telegram": "<=800 char markdown alert",
-  "youtube_script": "40-word 15-sec script",
-  "newsletter_blurb": "120-180 word briefing"
+  "youtube_script": "40-word 15-sec script"
 }
 ```
 
-All five platforms in one round trip. Typical cost: $0.0005 per item with Haiku.
+All four platforms in one round trip. Typical cost: $0.0005 per item with Haiku.
 Parses with `json.loads`; retries on parse failure up to 3 times with exponential
 backoff.
 
@@ -118,7 +116,6 @@ Adapter contracts:
 | `threads.py` | Meta Threads API | Long-lived access token | 2-step: container → publish |
 | `telegram.py` | Bot API (HTTP) | Bot token | Direct HTTP, no library |
 | `youtube.py` | YouTube Data v3 | OAuth refresh token | Scaffold only; video pipeline TODO |
-| `beehiiv.py` | beehiiv API v2 | Bearer token | Queues per-item; sends daily digest |
 
 ### `main.py`
 
@@ -155,7 +152,7 @@ news_items(
 
 posts(
   id, news_item_id FK,
-  platform CHECK IN ('x','threads','telegram','youtube','beehiiv'),
+  platform CHECK IN ('x','threads','telegram','youtube'),
   platform_post_id,
   content,
   posted_at,

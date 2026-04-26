@@ -2,7 +2,6 @@
 import pytest
 
 from src.adapters import (
-    BeehiivAdapter,
     TelegramAdapter,
     ThreadsAdapter,
     XAdapter,
@@ -13,7 +12,7 @@ from src.config import settings
 
 @pytest.mark.parametrize(
     "adapter_cls",
-    [XAdapter, TelegramAdapter, ThreadsAdapter, BeehiivAdapter],
+    [XAdapter, TelegramAdapter, ThreadsAdapter],
 )
 async def test_adapter_dry_run_returns_ok(adapter_cls, monkeypatch):
     monkeypatch.setattr(settings, "dry_run", True)

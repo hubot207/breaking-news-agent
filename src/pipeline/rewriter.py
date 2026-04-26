@@ -1,7 +1,7 @@
 """AI Rewriter - the brain of the pipeline.
 
 One LLM call takes a news item and returns a JSON object with platform-specific
-variants. This is the central cost-saver: we generate all 5 outputs from one call.
+variants. This is the central cost-saver: we generate all outputs from one call.
 """
 from __future__ import annotations
 
@@ -24,7 +24,6 @@ class PlatformVariants:
     threads: str
     telegram: str
     youtube_script: str
-    newsletter_blurb: str
 
     def to_dict(self) -> dict[str, str]:
         return {
@@ -32,7 +31,6 @@ class PlatformVariants:
             "threads": self.threads,
             "telegram": self.telegram,
             "youtube": self.youtube_script,
-            "beehiiv": self.newsletter_blurb,
         }
 
 
@@ -50,8 +48,7 @@ Return ONLY valid JSON, nothing else. Shape:
   "x": "...",             // <=270 chars, punchy, ends with source link
   "threads": "...",       // <=480 chars, conversational
   "telegram": "...",      // <=800 chars, markdown, bold the verb ("*confirmed*")
-  "youtube_script": "...",// 15-second spoken script, ~40 words, hook in first 3 sec
-  "newsletter_blurb": "..."// 120-180 words, includes context + why it matters
+  "youtube_script": "..." // 15-second spoken script, ~40 words, hook in first 3 sec
 }
 """
 
@@ -74,7 +71,6 @@ class AIRewriter:
                 threads=parsed["threads"],
                 telegram=parsed["telegram"],
                 youtube_script=parsed["youtube_script"],
-                newsletter_blurb=parsed["newsletter_blurb"],
             )
         except (json.JSONDecodeError, KeyError) as e:
             log.warning("rewriter_parse_failed", error=str(e), item_id=item.id)

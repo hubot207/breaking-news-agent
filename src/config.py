@@ -45,16 +45,11 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str = ""
     pexels_api_key: str = ""
 
-    # beehiiv
-    beehiiv_api_key: str = ""
-    beehiiv_publication_id: str = ""
-
     # Feature flags
     enable_x: bool = True
     enable_threads: bool = False
     enable_telegram: bool = True
     enable_youtube: bool = False
-    enable_beehiiv: bool = False
     dry_run: bool = True
 
     @property
@@ -68,7 +63,6 @@ class Settings(BaseSettings):
             "threads": self.enable_threads,
             "telegram": self.enable_telegram,
             "youtube": self.enable_youtube,
-            "beehiiv": self.enable_beehiiv,
         }
         return [name for name, on in flags.items() if on]
 

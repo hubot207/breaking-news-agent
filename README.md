@@ -1,10 +1,9 @@
 # Breaking News Agent
 
 An AI agent that ingests breaking news from RSS / NewsAPI and syndicates it in real time
-to **X, Threads, Telegram, YouTube Shorts, and beehiiv newsletter** — from a single
-content pipeline.
+to **X, Threads, Telegram, and YouTube Shorts** — from a single content pipeline.
 
-One LLM call per story generates five platform-specific variants; each adapter ships its
+One LLM call per story generates platform-specific variants; each adapter ships its
 variant independently. The system is idempotent, async, and fits in a $10/mo VPS.
 
 ## Architecture at a glance
@@ -12,10 +11,9 @@ variant independently. The system is idempotent, async, and fits in a $10/mo VPS
 ```
 [RSS / NewsAPI] → Ingester → Dedup → Filter → AI Rewriter
                                                    │
-       ┌──────────────┬──────────┬──────────┬──────┴───────┐
-       ▼              ▼          ▼          ▼              ▼
-   X adapter    Threads    Telegram   YouTube         beehiiv
-                                      Shorts        Newsletter
+              ┌──────────────┬──────────┬──────────┴────────┐
+              ▼              ▼          ▼                   ▼
+          X adapter    Threads    Telegram          YouTube Shorts
                                        │
                                        ▼
                                Analytics Collector
@@ -81,14 +79,13 @@ breaking-news-agent/
 │   ├── pipeline/
 │   │   ├── dedup.py         # URL-hash based deduplication
 │   │   ├── filter.py        # rule-based "is this breaking?" scorer
-│   │   └── rewriter.py      # single LLM call → 5 variants
+│   │   └── rewriter.py      # single LLM call → 4 variants
 │   ├── adapters/            # one file per platform
 │   └── analytics/           # metrics pullback
 ├── tests/                   # pytest unit tests
 ├── scripts/
 │   ├── deploy.sh            # one-shot VPS bootstrap
-│   ├── init_db.py
-│   └── send_daily_digest.py
+│   └── init_db.py
 ├── docs/
 │   ├── ARCHITECTURE.md
 │   ├── SETUP.md
@@ -113,7 +110,7 @@ pytest
 - **Idempotency.** The `(news_item_id, platform)` unique constraint on `posts` prevents
   double-posting after crashes or retries.
 - **Cost control.** The rule-based filter rejects ~60-80% of items before they hit the LLM.
-  One LLM call per breaking-news item yields all five variants.
+  One LLM call per breaking-news item yields all platform variants.
 
 ## License
 

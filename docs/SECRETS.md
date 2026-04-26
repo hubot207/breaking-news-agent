@@ -1,6 +1,6 @@
 # Secrets Management
 
-The agent needs quite a few credentials: Anthropic API key, X tokens, Threads token, Telegram bot token, beehiiv key, ElevenLabs, etc. This doc explains your options, ordered from simplest to most robust, and gives you a recommended setup for a solo operator.
+The agent needs quite a few credentials: Anthropic API key, X tokens, Threads token, Telegram bot token, ElevenLabs, etc. This doc explains your options, ordered from simplest to most robust, and gives you a recommended setup for a solo operator.
 
 ## TL;DR recommendation
 
@@ -216,7 +216,7 @@ Doppler injects secrets as env vars — your `.env` file disappears. Rotate in t
 3. **Set spend limits.** Anthropic and OpenAI both let you set monthly caps. Use them.
 4. **Rotate on any suspicion of leak.** All providers have one-click rotation in their dashboards.
 5. **Back up the age key** (if using SOPS) in a password manager. If you lose it, you can't decrypt.
-6. **Audit logs quarterly.** Review the X / Telegram / beehiiv dashboards for unexpected API usage.
+6. **Audit logs quarterly.** Review the X / Telegram dashboards for unexpected API usage.
 7. **Use separate keys per environment.** Even for a solo operator, keep dev and prod keys distinct — makes debugging safer.
 
 ## Recommended path for you specifically

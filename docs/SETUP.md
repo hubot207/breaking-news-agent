@@ -125,7 +125,7 @@ A few things to watch in the first week:
 - `logs/*.log` — look for `rewriter_parse_failed` (prompt needs tuning) or
   `publish_failed` (credentials issue).
 - SQLite: `sqlite3 data/agent.db 'SELECT platform, status, COUNT(*) FROM posts GROUP BY 1,2'`
-- Platform dashboards (X Analytics, Telegram Analytics, beehiiv Stats).
+- Platform dashboards (X Analytics, Telegram Analytics).
 
 ## Troubleshooting
 

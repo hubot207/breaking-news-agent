@@ -78,17 +78,11 @@ ask ELEVENLABS_API_KEY   "ElevenLabs key (TTS, optional)" "" yes
 ask PEXELS_API_KEY       "Pexels key (stock footage, optional)" "" yes
 echo
 
-echo "# ---- beehiiv ----"
-ask BEEHIIV_API_KEY      "beehiiv API key" "" yes
-ask BEEHIIV_PUBLICATION_ID "beehiiv publication id"
-echo
-
 echo "# ---- Feature flags ----"
 read -r -p "  Enable X? [y/N] " v;        echo "ENABLE_X=$([[ $v =~ ^[Yy] ]] && echo true || echo false)"
 read -r -p "  Enable Threads? [y/N] " v;  echo "ENABLE_THREADS=$([[ $v =~ ^[Yy] ]] && echo true || echo false)"
 read -r -p "  Enable Telegram? [Y/n] " v; echo "ENABLE_TELEGRAM=$([[ $v =~ ^[Nn] ]] && echo false || echo true)"
 read -r -p "  Enable YouTube? [y/N] " v;  echo "ENABLE_YOUTUBE=$([[ $v =~ ^[Yy] ]] && echo true || echo false)"
-read -r -p "  Enable beehiiv? [y/N] " v;  echo "ENABLE_BEEHIIV=$([[ $v =~ ^[Yy] ]] && echo true || echo false)"
 
 read -r -p "  Live posting? (DRY_RUN=false) [y/N] " v
 echo "DRY_RUN=$([[ $v =~ ^[Yy] ]] && echo false || echo true)"

@@ -32,12 +32,8 @@ YOUTUBE_REFRESH_TOKEN={{ op://breaking-news-agent/youtube/refresh_token }}
 ELEVENLABS_API_KEY={{ op://breaking-news-agent/elevenlabs/credential }}
 PEXELS_API_KEY={{ op://breaking-news-agent/pexels/credential }}
 
-BEEHIIV_API_KEY={{ op://breaking-news-agent/beehiiv/api_key }}
-BEEHIIV_PUBLICATION_ID={{ op://breaking-news-agent/beehiiv/publication_id }}
-
 ENABLE_X=true
 ENABLE_THREADS=false
 ENABLE_TELEGRAM=true
 ENABLE_YOUTUBE=false
-ENABLE_BEEHIIV=true
 DRY_RUN=false

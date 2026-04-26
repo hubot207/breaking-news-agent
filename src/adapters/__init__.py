@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from src.adapters.base import AdapterResult, BaseAdapter
-from src.adapters.beehiiv import BeehiivAdapter
 from src.adapters.telegram import TelegramAdapter
 from src.adapters.threads import ThreadsAdapter
 from src.adapters.x import XAdapter
@@ -11,7 +10,6 @@ from src.adapters.youtube import YouTubeAdapter
 __all__ = [
     "AdapterResult",
     "BaseAdapter",
-    "BeehiivAdapter",
     "TelegramAdapter",
     "ThreadsAdapter",
     "XAdapter",
@@ -28,6 +26,5 @@ def get_adapter(name: str) -> BaseAdapter:
         "threads": ThreadsAdapter(),
         "telegram": TelegramAdapter(),
         "youtube": YouTubeAdapter(),
-        "beehiiv": BeehiivAdapter(),
     }
     return mapping[name]

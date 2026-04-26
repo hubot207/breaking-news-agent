@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "breaking-news-agent"
 version = "0.1.0"
-description = "AI agent that ingests breaking news and syndicates to X, Threads, Telegram, YouTube Shorts, and beehiiv."
+description = "AI agent that ingests breaking news and syndicates to X, Threads, Telegram, and YouTube Shorts."
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Prince" }]
