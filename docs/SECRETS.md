@@ -10,6 +10,23 @@ For anything you want to version-control or share across machines: **SOPS + age*
 
 For a team or multiple environments: **Doppler** or **Infisical** (both have free tiers).
 
+If you already use 1Password as your password manager: **`op inject`** — see Tier 2.5.
+
+## Helper scripts
+
+Whichever option you pick, the repo provides drop-in helpers that render `.env`
+from your chosen secret store with a single command:
+
+```bash
+bash scripts/setup-env.sh                    # interactive prompts (Tier 1)
+bash scripts/secrets-fetch.sh doppler        # Tier 3 - Doppler
+bash scripts/secrets-fetch.sh sops           # Tier 2 - SOPS + age
+bash scripts/secrets-fetch.sh 1password      # Tier 2.5 - 1Password CLI
+bash scripts/secrets-fetch.sh aws            # Tier 4 - AWS Secrets Manager
+```
+
+All four write `.env` with `chmod 600` and are safe to re-run.
+
 ---
 
 ## Tier 1 — `.env` file on the server (what you have today)
@@ -95,6 +112,38 @@ chmod 600 .env
 - The age private key is still a single point of failure — keep it in 1Password or a hardware key.
 
 **When to use it:** Once you have a second machine, a CI pipeline, or want to track who changed which secret when.
+
+---
+
+## Tier 2.5 — 1Password CLI
+
+If you already use 1Password as a password manager, the CLI lets you template
+a `.env` without copy-pasting any secret values.
+
+**One-time setup:**
+
+```bash
+brew install 1password-cli
+op signin
+op vault create breaking-news-agent
+# Add API Credential items to the vault, one per service.
+```
+
+The repo ships a template at `.env.1password.tpl` that references each item
+via `op://` URIs. Render it with:
+
+```bash
+bash scripts/secrets-fetch.sh 1password
+# runs: op inject -i .env.1password.tpl -o .env
+```
+
+For headless servers, create a 1Password Service Account and set
+`OP_SERVICE_ACCOUNT_TOKEN` instead of running `op signin`.
+
+**Pros:** TOTP support, biometric unlock on dev machines, items reviewable in
+the 1Password UI, free if you already pay for the family/team plan.
+**Cons:** $3/mo per user without an existing plan. Server needs a service
+account token to run unattended.
 
 ---
 
