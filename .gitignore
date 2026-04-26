@@ -32,6 +32,8 @@ ENV/
 *.key
 *.pem
 credentials.json
+.deploy-config.local
+*.local
 
 # IDE
 .vscode/

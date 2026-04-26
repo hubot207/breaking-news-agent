@@ -1,0 +1,20 @@
+# Copy this file to `.deploy-config.local` and fill in your values.
+# `.deploy-config.local` is gitignored - it never gets committed.
+# Once deployment is complete, you can delete it.
+
+# ---- VPS ----
+VPS_IP=
+VPS_USER=root
+
+# ---- Doppler ----
+# Get this from: Doppler -> project -> prod config -> Access tab ->
+# Service Tokens -> Generate -> pick "Read-only" -> name "vps-prod"
+DOPPLER_TOKEN=
+
+# ---- Telegram (just the handle, the token lives in Doppler) ----
+TELEGRAM_HANDLE=
+
+# ---- GitHub ----
+# Confirm the repo is pushed and accessible. Set to "yes" once verified.
+GITHUB_PUSHED=no
+GITHUB_REPO_URL=git@github.com:hubot207/breaking-news-agent.git
