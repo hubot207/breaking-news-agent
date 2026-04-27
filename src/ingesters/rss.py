@@ -27,16 +27,27 @@ class RSSIngester(BaseIngester):
             *(asyncio.to_thread(self._fetch_one, url) for url in self.urls),
             return_exceptions=True,
         )
+        empty_feeds: list[str] = []
         for url, result in zip(self.urls, results):
             if isinstance(result, Exception):
                 log.warning("rss_fetch_failed", url=url, error=str(result))
                 continue
+            if not result:
+                empty_feeds.append(url)
             items.extend(result)
-        log.info("rss_fetched", count=len(items), feeds=len(self.urls))
+        log.info("rss_fetched", count=len(items), feeds=len(self.urls), empty=len(empty_feeds))
+        if empty_feeds:
+            for url in empty_feeds:
+                log.warning("rss_feed_empty", url=url)
         return items
 
     def _fetch_one(self, url: str) -> list[RawItem]:
         feed = feedparser.parse(url)
+        if getattr(feed, "bozo", False) and feed.bozo_exception:
+            log.warning("rss_feed_malformed", url=url, error=str(feed.bozo_exception))
+        if hasattr(feed, "status") and feed.status >= 400:
+            log.warning("rss_feed_http_error", url=url, status=feed.status)
+            return []
         out: list[RawItem] = []
         for entry in feed.entries:
             published: datetime | None = None
