@@ -18,14 +18,14 @@ fail() { printf "\n\033[1;31m[fail]\033[0m %s\n" "$*" >&2; exit 1; }
 
 [[ $EUID -eq 0 ]] || fail "Run as root: sudo bash $0"
 
-log "1/7  apt update + base packages"
+log "1/8  apt update + base packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get upgrade -y
 apt-get install -y ca-certificates curl gnupg lsb-release ufw fail2ban \
     git sqlite3 unattended-upgrades
 
-log "2/7  install Docker engine + Compose plugin"
+log "2/8  install Docker engine + Compose plugin"
 if ! command -v docker >/dev/null 2>&1; then
     install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
@@ -40,7 +40,7 @@ https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
 fi
 systemctl enable --now docker
 
-log "3/7  create app user '${APP_USER}'"
+log "3/8  create app user '${APP_USER}'"
 if ! id -u "$APP_USER" >/dev/null 2>&1; then
     adduser --disabled-password --gecos "" "$APP_USER"
 fi
@@ -53,24 +53,29 @@ if [[ -f /root/.ssh/authorized_keys ]]; then
     chown -R "$APP_USER:$APP_USER" "$APP_HOME/.ssh"
 fi
 
-log "4/7  configure UFW firewall (allow SSH only)"
+log "4/8  configure UFW firewall (allow SSH only)"
 ufw --force reset
 ufw default deny incoming
 ufw default allow outgoing
 ufw allow "${SSH_PORT}"/tcp comment "ssh"
 ufw --force enable
 
-log "5/7  enable automatic security updates"
+log "5/8  enable automatic security updates"
 dpkg-reconfigure -f noninteractive unattended-upgrades || true
 cat > /etc/apt/apt.conf.d/20auto-upgrades <<EOF
 APT::Periodic::Update-Package-Lists "1";
 APT::Periodic::Unattended-Upgrade "1";
 EOF
 
-log "6/7  fail2ban (SSH brute-force protection)"
+log "6/8  fail2ban (SSH brute-force protection)"
 systemctl enable --now fail2ban
 
-log "7/7  harden SSH (disable password auth)"
+log "7/8  install Doppler CLI (used by deploy workflow)"
+if ! command -v doppler >/dev/null 2>&1; then
+    curl -Ls --tlsv1.2 https://cli.doppler.com/install.sh | sh
+fi
+
+log "8/8  harden SSH (disable password auth)"
 sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
 sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
 systemctl restart ssh
