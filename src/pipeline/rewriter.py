@@ -34,23 +34,63 @@ class PlatformVariants:
         }
 
 
-SYSTEM_PROMPT = """You are a breaking-news rewriter for a multi-platform news brand.
+SYSTEM_PROMPT = """You are a breaking-news rewriter for a multi-platform news brand named Synapse.
 Given a news headline and summary, produce a JSON object with one variant for each platform.
+
 Rules:
 - NEVER quote the source verbatim. ALWAYS rewrite.
 - Add a short analytical angle or implication where it's natural.
-- Include the source link.
+- Include the source link at the end of the x and threads variants.
 - Never fabricate facts not in the input.
-- Tone must match each platform; see formats below.
+- Tone must match each platform.
 
-Return ONLY valid JSON, nothing else. Shape:
-{
-  "x": "...",             // <=270 chars, punchy, ends with source link
-  "threads": "...",       // <=480 chars, conversational
-  "telegram": "...",      // <=800 chars, markdown, bold the verb ("*confirmed*")
-  "youtube_script": "..." // 15-second spoken script, ~40 words, hook in first 3 sec
-}
+Per-platform constraints:
+- x: 270 characters max. Punchy, ends with the source link.
+- threads: 480 characters max. Conversational, ends with the source link.
+- telegram: 800 characters max. Markdown formatting allowed (bold key verbs with *asterisks*).
+- youtube_script: ~40 words for a 15-second spoken script. Hook in first 3 seconds.
+
+Output rules (CRITICAL):
+- Return ONLY a single raw JSON object.
+- Do NOT wrap the JSON in markdown code fences like ```json or ```.
+- Do NOT include any prose before or after the JSON.
+- Do NOT include comments inside the JSON.
+- Use double quotes, not single quotes.
+
+The JSON must have exactly these four keys: "x", "threads", "telegram", "youtube_script".
 """
+
+
+def _extract_json(raw: str) -> str:
+    """Pull the JSON object out of a possibly-decorated LLM response.
+
+    Handles common wrappings:
+    - Markdown code fences: ```json\\n{...}\\n``` or ```\\n{...}\\n```
+    - Leading/trailing prose: "Here is the JSON:\\n{...}\\nHope this helps!"
+    - Stray whitespace.
+
+    Returns the substring from the first { to the last } (matching depth-1
+    boundaries). If no JSON object is detected, returns the original string
+    so json.loads raises a useful error.
+    """
+    if not raw:
+        return raw
+    s = raw.strip()
+    # Strip markdown code fences if present
+    if s.startswith("```"):
+        # remove opening fence (```json or just ```)
+        first_newline = s.find("\n")
+        if first_newline != -1:
+            s = s[first_newline + 1 :]
+        # remove trailing fence
+        if s.rstrip().endswith("```"):
+            s = s.rstrip()[:-3].rstrip()
+    # Find the outermost JSON object boundaries
+    start = s.find("{")
+    end = s.rfind("}")
+    if start == -1 or end == -1 or end < start:
+        return s
+    return s[start : end + 1]
 
 
 class AIRewriter:
@@ -63,9 +103,11 @@ class AIRewriter:
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     async def rewrite(self, item: NewsItem) -> Optional[PlatformVariants]:
         user_prompt = self._build_user_prompt(item)
+        raw = ""
         try:
             raw = await self._call_llm(user_prompt)
-            parsed = json.loads(raw)
+            cleaned = _extract_json(raw)
+            parsed = json.loads(cleaned)
             return PlatformVariants(
                 x=parsed["x"],
                 threads=parsed["threads"],
@@ -73,7 +115,14 @@ class AIRewriter:
                 youtube_script=parsed["youtube_script"],
             )
         except (json.JSONDecodeError, KeyError) as e:
-            log.warning("rewriter_parse_failed", error=str(e), item_id=item.id)
+            # Log a short preview of the offending response to make this debuggable.
+            preview = raw[:200].replace("\n", " ") if raw else "(empty)"
+            log.warning(
+                "rewriter_parse_failed",
+                error=str(e),
+                item_id=item.id,
+                response_preview=preview,
+            )
             return None
 
     def _build_user_prompt(self, item: NewsItem) -> str:
