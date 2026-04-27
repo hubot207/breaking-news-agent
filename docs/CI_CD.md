@@ -49,17 +49,20 @@ ssh -i ~/.ssh/synapse_deploy bna@<vps-ip> 'echo deploy-key-works'
 
 Keep the private key (`~/.ssh/synapse_deploy`) safe on your laptop — you'll paste it into GitHub Actions secrets in a moment.
 
-### 2. Add three secrets to GitHub Actions
+### 2. Add four secrets to GitHub Actions
 
 GitHub repo → **Settings → Secrets and variables → Actions → New repository secret**.
 
-Add these three:
+Add these four:
 
 | Name | Value |
 |---|---|
 | `DEPLOY_SSH_KEY` | Full contents of `~/.ssh/synapse_deploy` (private key, including `-----BEGIN…` and `-----END…` lines) |
 | `VPS_HOST` | Your VPS IP address (e.g., `5.161.42.123`) |
 | `VPS_USER` | `bna` (the deploy user `bootstrap-vps.sh` creates) |
+| `DOPPLER_TOKEN` | Read-only Doppler service token scoped to your `prod` config (starts with `dp.st.prod.`) |
+
+The workflow exports `DOPPLER_TOKEN` into the SSH session so the Doppler CLI on the VPS can authenticate without persisting any token to disk. To rotate the token, regenerate in Doppler and update this single GitHub secret.
 
 ### 3. Optional: require approval for production deploys
 
@@ -84,10 +87,11 @@ Three ways:
 It does not bootstrap a fresh VPS. The first time you provision a new server, run `scripts/bootstrap-vps.sh` and `scripts/deploy.sh` manually. After that, the CI workflow handles every subsequent change.
 
 It does not manage Doppler secrets. The workflow runs `scripts/secrets-fetch.sh doppler` on the VPS, which assumes:
-- Doppler CLI is already installed on the VPS (the manual deploy installs it)
-- The VPS has a saved Doppler config OR the `DOPPLER_TOKEN` env var is set
+- Doppler CLI is already installed on the VPS (the one-time prep installs it)
+- `DOPPLER_TOKEN` is exported into the SSH session by the workflow
 
-If you need to rotate the Doppler token, update it both in Doppler (regenerate) and on the VPS (`doppler configure set token <new>` as the bna user).
+If you need to rotate the Doppler token, regenerate it in Doppler and update the
+`DOPPLER_TOKEN` secret in GitHub Actions. No VPS-side change required.
 
 ## Common failure modes
 
@@ -95,7 +99,7 @@ If you need to rotate the Doppler token, update it both in Doppler (regenerate) 
 |---|---|---|
 | `Permission denied (publickey)` in the deploy step | Public key not in VPS authorized_keys | Re-run step 1's `ssh-copy-id` |
 | `Host key verification failed` | VPS host key changed (server rebuilt) | Workflow re-adds via `ssh-keyscan`; if it persists, manually trigger a re-run |
-| `secrets-fetch.sh` errors with `not authenticated` | `DOPPLER_TOKEN` missing on VPS | SSH in as `bna`, run `doppler configure set token <token>` |
+| `secrets-fetch.sh` errors with `not authenticated` | `DOPPLER_TOKEN` GitHub secret missing or expired | Regenerate in Doppler, update the GitHub Actions secret |
 | Container starts then crashes | Bad code or missing secret | Check `docker compose logs` on the VPS, or read the workflow's "Health check" step output |
 
 ## Security notes

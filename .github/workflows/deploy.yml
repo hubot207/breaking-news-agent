@@ -33,19 +33,23 @@ jobs:
           ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy on VPS
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
         run: |
-          ssh -o StrictHostKeyChecking=yes ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} '
-            set -euo pipefail
-            cd /opt/breaking-news-agent
-            echo "[deploy] git pull"
-            git pull --ff-only
-            echo "[deploy] secrets sync from Doppler"
-            bash scripts/secrets-fetch.sh doppler
-            echo "[deploy] rebuild and restart"
-            docker compose up -d --build
-            echo "[deploy] container status"
-            docker compose ps
-          '
+          ssh -o StrictHostKeyChecking=yes \
+              ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
+              DOPPLER_TOKEN="${DOPPLER_TOKEN}" bash -s <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          cd /opt/breaking-news-agent
+          echo "[deploy] git pull"
+          git pull --ff-only
+          echo "[deploy] secrets sync from Doppler"
+          bash scripts/secrets-fetch.sh doppler
+          echo "[deploy] rebuild and restart"
+          docker compose up -d --build
+          echo "[deploy] container status"
+          docker compose ps
+          REMOTE_SCRIPT
 
       - name: Health check
         run: |
