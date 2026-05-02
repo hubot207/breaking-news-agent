@@ -145,7 +145,16 @@ async def _publish(session: Session, news_item_id: int, platform: str, content: 
 
 
 async def run_forever() -> None:
-    log.info("agent_starting", enabled_platforms=settings.enabled_adapters, dry_run=settings.dry_run)
+    # Mask the base URL host so it's grep-able but reads sensibly when default.
+    base_url = settings.openai_base_url or "default"
+    log.info(
+        "agent_starting",
+        enabled_platforms=settings.enabled_adapters,
+        dry_run=settings.dry_run,
+        ai_provider=settings.ai_provider,
+        ai_model=settings.ai_model,
+        ai_base_url=base_url,
+    )
     while True:
         try:
             await run_pipeline_once()
