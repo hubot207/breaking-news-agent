@@ -1,0 +1,28 @@
+# Vector config: tail every docker container's logs and ship to Better Stack.
+# Token comes from BETTERSTACK_SOURCE_TOKEN env var (set in Doppler).
+#
+# Reference: https://betterstack.com/docs/logs/sources/vector/
+
+data_dir = "/var/lib/vector"
+
+[sources.docker]
+type = "docker_logs"
+# Skip Vector's own logs to avoid feedback loops.
+exclude_containers = ["bna-vector"]
+
+# Drop noisy "HTTP Request" lines from the OpenAI/Gemini SDK (one per call,
+# adds up fast). Comment this out to keep them.
+[transforms.filter_noise]
+type = "filter"
+inputs = ["docker"]
+condition = '!contains!(string!(.message), "HTTP Request:")'
+
+[sinks.betterstack]
+type = "http"
+inputs = ["filter_noise"]
+uri = "https://in.logs.betterstack.com"
+encoding.codec = "json"
+compression = "gzip"
+[sinks.betterstack.auth]
+strategy = "bearer"
+token = "${BETTERSTACK_SOURCE_TOKEN}"

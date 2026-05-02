@@ -14,3 +14,18 @@ services:
       interval: 60s
       timeout: 10s
       retries: 3
+
+  # Ships container logs to Better Stack via HTTPS.
+  # Requires BETTERSTACK_SOURCE_TOKEN to be set in .env (sourced from Doppler).
+  vector:
+    image: timberio/vector:latest-alpine
+    container_name: bna-vector
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./vector.toml:/etc/vector/vector.toml:ro
+      - ./data/vector:/var/lib/vector
+    environment:
+      BETTERSTACK_SOURCE_TOKEN: ${BETTERSTACK_SOURCE_TOKEN:-}
+    depends_on:
+      - agent
