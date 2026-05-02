@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     ai_model: str = "claude-haiku-4-5-20251001"
     anthropic_api_key: str = ""
     openai_api_key: str = ""
+    # Optional override for OpenAI-compatible endpoints (Gemini, OpenRouter, DeepSeek, etc.).
+    # Leave empty to use the default api.openai.com.
+    openai_base_url: str = ""
 
     # Sources
     rss_feeds: str = ""

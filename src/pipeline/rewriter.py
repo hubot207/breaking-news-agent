@@ -158,7 +158,12 @@ class AIRewriter:
     async def _call_openai(self, user_prompt: str) -> str:
         from openai import AsyncOpenAI
 
-        client = AsyncOpenAI(api_key=settings.openai_api_key)
+        # Allow pointing at any OpenAI-compatible endpoint (Gemini, OpenRouter,
+        # DeepSeek, Together, etc.) via OPENAI_BASE_URL. Empty = default OpenAI.
+        client = AsyncOpenAI(
+            api_key=settings.openai_api_key,
+            base_url=settings.openai_base_url or None,
+        )
         resp = await client.chat.completions.create(
             model=self.model,
             response_format={"type": "json_object"},
