@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # Optional override for OpenAI-compatible endpoints (Gemini, OpenRouter, DeepSeek, etc.).
     # Leave empty to use the default api.openai.com.
     openai_base_url: str = ""
+    # Cap LLM calls per minute. Prevents burst-induced 429s and runaway cost.
+    # Set to 0 to disable. Suggested: 12 for Gemini free tier, 60 for paid tiers.
+    ai_rate_limit_rpm: int = 60
 
     # Sources
     rss_feeds: str = ""

@@ -14,6 +14,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from src.config import settings
 from src.db import NewsItem
 from src.utils.logger import get_logger
+from src.utils.rate_limit import get_llm_limiter
 
 log = get_logger(__name__)
 
@@ -100,11 +101,16 @@ class AIRewriter:
         self.provider = settings.ai_provider
         self.model = settings.ai_model
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=2, min=2, max=60),
+        reraise=True,
+    )
     async def rewrite(self, item: NewsItem) -> Optional[PlatformVariants]:
         user_prompt = self._build_user_prompt(item)
         raw = ""
         try:
+            await get_llm_limiter().acquire()
             raw = await self._call_llm(user_prompt)
             cleaned = _extract_json(raw)
             parsed = json.loads(cleaned)
