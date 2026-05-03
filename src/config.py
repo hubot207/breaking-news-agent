@@ -31,6 +31,17 @@ class Settings(BaseSettings):
     # the LLM, saving cost.
     breaking_filter_threshold: float = 0.3
 
+    # Per-platform daily post caps. 0 = unlimited.
+    # X: cap aggressively - high frequency hurts X's algorithmic distribution
+    # and bills add up at $0.01 per post. 15-30/day is the sweet spot.
+    # Threads: similar dynamics; capped lower than Telegram.
+    # Telegram: unlimited - direct subscribers, no algorithm penalty.
+    # YouTube: capped low because video assembly is expensive.
+    x_daily_post_limit: int = 15
+    threads_daily_post_limit: int = 25
+    telegram_daily_post_limit: int = 0
+    youtube_daily_post_limit: int = 5
+
     # Sources
     rss_feeds: str = ""
     newsapi_key: str = ""

@@ -12,7 +12,7 @@ import asyncio
 import json
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.adapters import get_adapter
@@ -89,18 +89,42 @@ async def _process_item(session: Session, item: NewsItem, rewriter: AIRewriter) 
     item.status = "rewritten"
     session.flush()
 
-    # Publish to enabled platforms in parallel
+    # Publish to enabled platforms in parallel, respecting per-platform daily caps.
     variant_map = variants.to_dict()
     tasks = []
     for platform in settings.enabled_adapters:
         content = variant_map.get(platform)
         if not content:
             continue
+        if not _under_daily_cap(session, platform):
+            log.info("daily_cap_reached_skipping", platform=platform)
+            continue
         tasks.append(_publish(session, item.id, platform, content))
     if tasks:
         await asyncio.gather(*tasks, return_exceptions=True)
 
     item.status = "posted"
+
+
+def _under_daily_cap(session: Session, platform: str) -> bool:
+    """Returns True if today's post count for `platform` is below the configured cap.
+
+    A cap of 0 means unlimited. Day boundary is UTC 00:00. Counts only posts
+    that actually shipped (status='posted'), so failed attempts don't burn
+    cap budget.
+    """
+    cap = getattr(settings, f"{platform}_daily_post_limit", 0)
+    if cap <= 0:
+        return True
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    count = session.execute(
+        select(func.count(Post.id)).where(
+            Post.platform == platform,
+            Post.posted_at >= today_start,
+            Post.status == "posted",
+        )
+    ).scalar() or 0
+    return count < cap
 
 
 async def _publish(session: Session, news_item_id: int, platform: str, content: str) -> None:
