@@ -1,10 +1,14 @@
-# Breaking News Agent
+# Synapse — what builders need to know about AI today
 
-An AI agent that ingests breaking news from RSS / NewsAPI and syndicates it in real time
-to **X, Threads, Telegram, and YouTube Shorts** — from a single content pipeline.
+An AI agent that ingests AI/tech news from curated RSS feeds and syndicates it
+in real time to **X, Threads, Telegram, and YouTube Shorts** — from a single
+content pipeline.
 
-One LLM call per story generates platform-specific variants; each adapter ships its
-variant independently. The system is idempotent, async, and fits in a $10/mo VPS.
+The brand voice is technical-but-accessible, written for software engineers,
+founders, and product people who ship AI products. One LLM call per story
+generates platform-specific variants with a "Builder angle:" line where it's
+natural; each adapter ships its variant independently. The system is
+idempotent, async, and fits in a $10/mo VPS.
 
 ## Architecture at a glance
 

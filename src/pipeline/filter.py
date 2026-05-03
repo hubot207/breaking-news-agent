@@ -17,20 +17,49 @@ from src.utils.logger import get_logger
 
 log = get_logger(__name__)
 
-# Strong signals an item IS time-sensitive news (small bonus on top of baseline).
+# Synapse is positioned as "what builders need to know about AI today."
+# These keyword sets reflect that niche - boost AI/tech/dev/builder signals,
+# down-rank politics, sports, lifestyle, and pure entertainment.
+#
+# All matching is substring (`kw in text`). Keep keywords distinctive enough
+# to avoid false positives - "ai" by itself would match "said", "again", etc.
+# Use base verb forms ("launch") so all conjugations match ("launched",
+# "launches", "launching").
+
+# Strong signals this is the AI/tech news our audience cares about.
 NEWS_KEYWORDS = {
-    "breaking", "just in", "urgent", "alert", "announced",
-    "confirmed", "reports", "exclusive", "launches", "unveils",
-    "reveals", "killed", "dies", "wins", "passes", "approves",
-    "rejects", "resigns", "elected", "raids", "arrested",
+    # AI-specific terminology
+    "llm", "gpt-", "claude", "gemini", "mistral", "llama",
+    "fine-tune", "rlhf", "embedding", "transformer",
+    "neural network", "deep learning", "machine learning",
+    "artificial intelligence", "context window",
+    "open-source", "open source", "open-weights",
+    "agentic", "multimodal",
+    # AI-orbit companies
+    "openai", "anthropic", "deepmind", "perplexity",
+    "cursor", "huggingface", "hugging face",
+    "nvidia", "groq", "cerebras", "stability ai",
+    # Dev / infra terms
+    "framework", "benchmark", "github", "kubernetes",
+    "python", "typescript", "rust",
+    "saas", "startup", "yc-backed", "y combinator",
+    # News-velocity verb stems
+    "release", "launch", "unveil", "announce", "ship",
+    "raise", "funding", "valuation", "acquire", "ipo",
 }
 
-# Strong signals an item is NOT time-sensitive news (opinion, evergreen, listicle).
+# Strong signals this isn't for our builder audience.
 NEGATIVE_KEYWORDS = {
-    "opinion", "op-ed", "analysis: ", "how to", "guide to",
+    # Format flags
+    "opinion:", "op-ed", "analysis:", "how to", "guide to",
     "review:", "best of", "top 10", "top ten", "listicle",
     "horoscope", "recipe", "gift guide", "deal alert",
     "sponsored", "advertisement", "promo code",
+    # Off-niche topics our audience didn't sign up for
+    "celebrity", "royal family", "kardashian",
+    "premier league", "world cup", "nba", "nfl",
+    "olympics", "match of the day",
+    "weather forecast", "lottery",
 }
 
 
@@ -54,10 +83,11 @@ class BreakingNewsFilter:
                 break  # one bonus is enough; don't pile up
 
         # Negative signal: clear non-news markers (strong penalty so a recent
-        # opinion/listicle/review reliably fails the default 0.3 threshold).
+        # opinion/listicle/review reliably fails the default 0.3 threshold,
+        # even when the headline also matches a positive news verb).
         for kw in NEGATIVE_KEYWORDS:
             if kw in text:
-                score -= 0.5
+                score -= 0.7
                 break
 
         # Recency: bonus for fresh, penalty for stale.
