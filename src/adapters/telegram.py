@@ -38,6 +38,30 @@ class TelegramAdapter(BaseAdapter):
                 return AdapterResult(ok=False, error=data.get("description"))
             post_id = str(data["result"]["message_id"])
             return AdapterResult(ok=True, platform_post_id=post_id)
+        except httpx.HTTPStatusError as e:
+            # Telegram puts the bot token in the URL path, which httpx echoes
+            # in str(e). Log only the structured fields, never the URL.
+            body_preview = (e.response.text or "")[:200]
+            log.error(
+                "telegram_publish_failed",
+                status=e.response.status_code,
+                reason=e.response.reason_phrase,
+                body=body_preview,
+            )
+            return AdapterResult(
+                ok=False, error=f"HTTP {e.response.status_code} {e.response.reason_phrase}"
+            )
         except Exception as e:
-            log.error("telegram_publish_failed", error=str(e))
-            return AdapterResult(ok=False, error=str(e))
+            # Defence in depth: scrub the token from any other exception text
+            # before it hits the log stream.
+            msg = self._scrub(str(e))
+            log.error("telegram_publish_failed", error=msg)
+            return AdapterResult(ok=False, error=msg)
+
+    @staticmethod
+    def _scrub(msg: str) -> str:
+        """Replace the bot token with <REDACTED> if it appears in `msg`."""
+        token = settings.telegram_bot_token
+        if token and token in msg:
+            return msg.replace(token, "<REDACTED>")
+        return msg
