@@ -53,13 +53,14 @@ class BreakingNewsFilter:
                 score += 0.15
                 break  # one bonus is enough; don't pile up
 
-        # Negative signal: clear non-news markers
+        # Negative signal: clear non-news markers (strong penalty so a recent
+        # opinion/listicle/review reliably fails the default 0.3 threshold).
         for kw in NEGATIVE_KEYWORDS:
             if kw in text:
-                score -= 0.4
+                score -= 0.5
                 break
 
-        # Recency: bonus for fresh, penalty for stale
+        # Recency: bonus for fresh, penalty for stale.
         if item.published_at:
             age = datetime.utcnow() - item.published_at.replace(tzinfo=None)
             if age < timedelta(hours=2):
@@ -67,7 +68,7 @@ class BreakingNewsFilter:
             elif age < timedelta(hours=12):
                 score += 0.05
             elif age > timedelta(hours=48):
-                score -= 0.3  # stale
+                score -= 0.4  # stale
 
         return max(0.0, min(1.0, score))
 
