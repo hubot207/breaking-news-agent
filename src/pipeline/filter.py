@@ -1,53 +1,76 @@
-"""Breaking-news relevance filter.
+"""Publishability filter.
 
-Rule-based pre-filter first (cheap), LLM classifier only for borderline cases.
-This keeps AI costs predictable.
+Decides whether a fresh news item is worth sending to the LLM rewriter.
+
+Design: default to "probably publishable" and subtract for clear non-news
+markers (opinion, listicle, review). This matches how real news headlines
+actually read - most don't include the word "breaking" but are still
+genuinely newsworthy. The threshold is configurable via settings.
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
+from src.config import settings
 from src.db import NewsItem
 from src.utils.logger import get_logger
 
 log = get_logger(__name__)
 
-BREAKING_KEYWORDS = {
-    "breaking", "just in", "urgent", "alert", "live",
-    "announced", "confirmed", "reports", "exclusive",
+# Strong signals an item IS time-sensitive news (small bonus on top of baseline).
+NEWS_KEYWORDS = {
+    "breaking", "just in", "urgent", "alert", "announced",
+    "confirmed", "reports", "exclusive", "launches", "unveils",
+    "reveals", "killed", "dies", "wins", "passes", "approves",
+    "rejects", "resigns", "elected", "raids", "arrested",
 }
+
+# Strong signals an item is NOT time-sensitive news (opinion, evergreen, listicle).
 NEGATIVE_KEYWORDS = {
-    "opinion", "analysis", "how to", "review", "best of",
-    "listicle", "horoscope", "recipe",
+    "opinion", "op-ed", "analysis: ", "how to", "guide to",
+    "review:", "best of", "top 10", "top ten", "listicle",
+    "horoscope", "recipe", "gift guide", "deal alert",
+    "sponsored", "advertisement", "promo code",
 }
 
 
 class BreakingNewsFilter:
-    """Scores a NewsItem for 'is this breaking?'. Score in [0,1]."""
+    """Scores a NewsItem for 'is this worth publishing?'. Score in [0, 1].
+
+    Defaults to a baseline of 0.5 (publishable), then nudges up for news
+    markers and down for non-news markers, with recency factored in.
+    """
+
+    BASELINE = 0.5
 
     def score(self, item: NewsItem) -> float:
         text = f"{item.title} {item.summary or ''}".lower()
-        score = 0.0
+        score = self.BASELINE
 
-        # Positive signal
-        for kw in BREAKING_KEYWORDS:
+        # Positive signal: explicit news verbs/markers
+        for kw in NEWS_KEYWORDS:
             if kw in text:
-                score += 0.3
+                score += 0.15
+                break  # one bonus is enough; don't pile up
 
-        # Negative signal
+        # Negative signal: clear non-news markers
         for kw in NEGATIVE_KEYWORDS:
             if kw in text:
-                score -= 0.5
+                score -= 0.4
+                break
 
-        # Recency bonus: newer = more breaking
+        # Recency: bonus for fresh, penalty for stale
         if item.published_at:
-            from datetime import datetime, timedelta
             age = datetime.utcnow() - item.published_at.replace(tzinfo=None)
-            if age < timedelta(hours=1):
-                score += 0.4
-            elif age < timedelta(hours=6):
+            if age < timedelta(hours=2):
                 score += 0.2
+            elif age < timedelta(hours=12):
+                score += 0.05
+            elif age > timedelta(hours=48):
+                score -= 0.3  # stale
 
-        # Clamp
         return max(0.0, min(1.0, score))
 
-    def is_breaking(self, item: NewsItem, threshold: float = 0.3) -> bool:
-        return self.score(item) >= threshold
+    def is_breaking(self, item: NewsItem, threshold: float | None = None) -> bool:
+        t = threshold if threshold is not None else settings.breaking_filter_threshold
+        return self.score(item) >= t

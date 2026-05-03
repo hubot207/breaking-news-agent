@@ -1,4 +1,4 @@
-"""Filter unit tests."""
+"""Publishability filter unit tests."""
 from datetime import datetime, timedelta
 
 from src.db import NewsItem
@@ -16,20 +16,53 @@ def _make_item(title: str, summary: str = "", age_minutes: int = 5) -> NewsItem:
     )
 
 
-def test_breaking_keywords_score_high():
+def test_plain_news_headline_passes():
+    """Default-publishable: a normal headline with no flags should be kept."""
     f = BreakingNewsFilter()
-    item = _make_item("BREAKING: court confirmed ruling")
+    item = _make_item("Apple unveils new Vision Pro 2 with 50% lower price")
     assert f.is_breaking(item)
 
 
-def test_opinion_scored_low():
+def test_explicit_breaking_keyword_passes():
     f = BreakingNewsFilter()
-    item = _make_item("Opinion: why we love X", age_minutes=5)
+    item = _make_item("BREAKING: court confirms ruling on tech antitrust")
+    assert f.is_breaking(item)
+
+
+def test_opinion_dropped():
+    f = BreakingNewsFilter()
+    item = _make_item("Opinion: why we love new gadgets")
     assert not f.is_breaking(item)
 
 
-def test_old_news_less_breaking():
+def test_listicle_dropped():
     f = BreakingNewsFilter()
-    recent = _make_item("Court confirmed", age_minutes=2)
-    old = _make_item("Court confirmed", age_minutes=10_000)
+    item = _make_item("Top 10 cookbooks of 2026")
+    assert not f.is_breaking(item)
+
+
+def test_review_dropped():
+    f = BreakingNewsFilter()
+    item = _make_item("Review: the new Vision Pro is good but expensive")
+    assert not f.is_breaking(item)
+
+
+def test_stale_news_dropped():
+    f = BreakingNewsFilter()
+    very_old = _make_item("Apple unveils product", age_minutes=72 * 60)
+    assert not f.is_breaking(very_old)
+
+
+def test_recent_outscores_old():
+    f = BreakingNewsFilter()
+    recent = _make_item("Court confirms ruling", age_minutes=2)
+    old = _make_item("Court confirms ruling", age_minutes=24 * 60)
     assert f.score(recent) > f.score(old)
+
+
+def test_threshold_argument_overrides_default():
+    f = BreakingNewsFilter()
+    item = _make_item("Apple unveils new product")
+    assert f.is_breaking(item, threshold=0.1)
+    # with a very strict threshold, the same item is dropped
+    assert not f.is_breaking(item, threshold=0.95)

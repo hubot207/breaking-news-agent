@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     # Set to 0 to disable. Suggested: 12 for Gemini free tier, 60 for paid tiers.
     ai_rate_limit_rpm: int = 60
 
+    # Score threshold for the publishability filter (0-1). Lower = more posts.
+    # Suggested: 0.3 lets most fresh news through; 0.5 is more selective; 0.7
+    # only true breaking-news markers. Items below threshold are dropped before
+    # the LLM, saving cost.
+    breaking_filter_threshold: float = 0.3
+
     # Sources
     rss_feeds: str = ""
     newsapi_key: str = ""
