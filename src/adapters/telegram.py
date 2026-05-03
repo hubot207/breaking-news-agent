@@ -22,13 +22,27 @@ class TelegramAdapter(BaseAdapter):
         if not settings.telegram_bot_token or not settings.telegram_channel_id:
             return AdapterResult(ok=False, error="Telegram credentials missing")
 
+        # First try with Markdown formatting. If it fails because the AI
+        # produced malformed entities (unclosed *bold*, mismatched links, etc.),
+        # retry as plain text so the post still gets published - just without
+        # the formatting flourish.
+        result = await self._send(content, parse_mode="Markdown")
+        if result.ok:
+            return result
+        if result.error and "parse entities" in result.error.lower():
+            log.warning("telegram_markdown_invalid_falling_back_to_plain")
+            return await self._send(content, parse_mode=None)
+        return result
+
+    async def _send(self, content: str, parse_mode: str | None) -> AdapterResult:
         url = f"{self.BASE}/bot{settings.telegram_bot_token}/sendMessage"
-        payload = {
+        payload: dict = {
             "chat_id": settings.telegram_channel_id,
             "text": content[:4000],
-            "parse_mode": "Markdown",
             "disable_web_page_preview": False,
         }
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 resp = await client.post(url, json=payload)
@@ -48,9 +62,10 @@ class TelegramAdapter(BaseAdapter):
                 reason=e.response.reason_phrase,
                 body=body_preview,
             )
-            return AdapterResult(
-                ok=False, error=f"HTTP {e.response.status_code} {e.response.reason_phrase}"
-            )
+            # Include the body in the error so the publish() caller can decide
+            # whether to retry (e.g. parse-entities -> retry without Markdown).
+            err = f"HTTP {e.response.status_code} {e.response.reason_phrase}: {body_preview}"
+            return AdapterResult(ok=False, error=err)
         except Exception as e:
             # Defence in depth: scrub the token from any other exception text
             # before it hits the log stream.
