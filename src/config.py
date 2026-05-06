@@ -26,21 +26,31 @@ class Settings(BaseSettings):
     ai_rate_limit_rpm: int = 60
 
     # Score threshold for the publishability filter (0-1). Lower = more posts.
-    # Suggested: 0.3 lets most fresh news through; 0.5 is more selective; 0.7
-    # only true breaking-news markers. Items below threshold are dropped before
-    # the LLM, saving cost.
-    breaking_filter_threshold: float = 0.3
+    # 0.3 = lets most fresh in-niche news through (used to be the default).
+    # 0.5 = more selective; only stronger items pass.
+    # 0.7 = only true breaking-news markers.
+    # Items below threshold are dropped before the LLM, saving cost.
+    breaking_filter_threshold: float = 0.5
 
-    # Per-platform daily post caps. 0 = unlimited.
-    # X: cap aggressively - high frequency hurts X's algorithmic distribution
-    # and bills add up at $0.01 per post. 15-30/day is the sweet spot.
-    # Threads: similar dynamics; capped lower than Telegram.
-    # Telegram: unlimited - direct subscribers, no algorithm penalty.
-    # YouTube: capped low because video assembly is expensive.
-    x_daily_post_limit: int = 15
-    threads_daily_post_limit: int = 25
-    telegram_daily_post_limit: int = 0
-    youtube_daily_post_limit: int = 5
+    # Per-platform publish guards. Two checks are applied before each post:
+    #
+    # 1. Daily cap: max posts allowed per UTC day (0 = unlimited).
+    # 2. Min interval: minimum minutes between consecutive posts to the same
+    #    platform (0 = no interval check).
+    #
+    # When either check fails, the item is skipped for that platform but still
+    # publishes to other enabled platforms whose guards allow it.
+    #
+    # Defaults reflect a brand-new account warming phase. Raise after 30 days
+    # of clean operation when the algorithm has classified you as legitimate.
+    telegram_daily_post_limit: int = 30
+    telegram_min_interval_min: int = 20
+    threads_daily_post_limit: int = 10
+    threads_min_interval_min: int = 90
+    x_daily_post_limit: int = 8
+    x_min_interval_min: int = 90
+    youtube_daily_post_limit: int = 3
+    youtube_min_interval_min: int = 240
 
     # Sources
     rss_feeds: str = ""
