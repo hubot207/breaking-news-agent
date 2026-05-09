@@ -17,23 +17,32 @@ def session():
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     with SessionLocal() as s:
-        # Seed a single news_item so Post FKs are valid
-        item = NewsItem(url_hash="h0", url="https://x/", source="s", title="t")
-        s.add(item)
-        s.commit()
         yield s
 
 
 def _seed_post(session: Session, platform: str, posted_at: datetime, status: str = "posted") -> None:
-    """Insert one Post row at a given timestamp."""
-    item = session.query(NewsItem).first()
+    """Insert one Post row at a given timestamp.
+
+    Each call creates a fresh NewsItem so the (news_item_id, platform) unique
+    constraint on the posts table doesn't fire when seeding multiple posts to
+    the same platform within a single test.
+    """
+    ts = posted_at.timestamp()
+    item = NewsItem(
+        url_hash=f"h-{platform}-{ts}",
+        url=f"https://example.com/{platform}/{ts}",
+        source="s",
+        title="t",
+    )
+    session.add(item)
+    session.flush()
     p = Post(
         news_item_id=item.id,
         platform=platform,
         content="x",
         status=status,
         posted_at=posted_at,
-        platform_post_id=f"{platform}-{posted_at.timestamp()}",
+        platform_post_id=f"{platform}-{ts}",
     )
     session.add(p)
     session.commit()
