@@ -6,6 +6,7 @@ variants. This is the central cost-saver: we generate all outputs from one call.
 from __future__ import annotations
 
 import json
+import random
 from dataclasses import dataclass
 from typing import Optional
 
@@ -17,6 +18,57 @@ from src.utils.logger import get_logger
 from src.utils.rate_limit import get_llm_limiter
 
 log = get_logger(__name__)
+
+
+# Voice modes rotated per-item to break the monotony of "every post sounds the
+# same". Selection is deterministic on item.id so retries don't shuffle the
+# mode mid-flight, which makes failures debuggable.
+VOICE_MODES: list[dict[str, str]] = [
+    {
+        "name": "dryly_skeptical",
+        "description": (
+            "Slightly skeptical tone. Cut through marketing language. If something is "
+            "overhyped or just an iteration, say so plainly. Don't be cynical for its "
+            "own sake - just refuse to mistake announcement-language for substance."
+        ),
+    },
+    {
+        "name": "genuinely_impressed",
+        "description": (
+            "Acknowledge real progress when you see it. Not glowing - just specific "
+            "about what's actually new or hard. The tone of an engineer who knows what "
+            "is hard and recognizes when something nails it."
+        ),
+    },
+    {
+        "name": "deadpan_factual",
+        "description": (
+            "Dry, almost understated. Just the most interesting facts. Minimal "
+            "commentary. Lets the news carry itself. Works when the news is genuinely "
+            "self-explanatory and doesn't need editorialising."
+        ),
+    },
+    {
+        "name": "reflective_contextual",
+        "description": (
+            "Place this news in context. Compare it to a prior moment in the field "
+            "(an earlier model release, a previous funding cycle, a shift the audience "
+            "has lived through) or to something else they already know. Find the "
+            "historical or industry pattern."
+        ),
+    },
+]
+
+
+def pick_voice_mode(item_id: int) -> dict[str, str]:
+    """Deterministically pick a voice mode for a given news item.
+
+    Using item_id as the seed means the same item always gets the same mode
+    if the rewriter is retried (after a parse failure, network error, rate
+    limit, etc.). Determinism makes log-driven debugging tractable.
+    """
+    rng = random.Random(item_id)
+    return rng.choice(VOICE_MODES)
 
 
 @dataclass
@@ -126,6 +178,13 @@ they're worth more than Stripe was at the same age. The bear case used to be
 'GitHub will copy this'. Bull case is now: maybe coding tools are just a
 genuinely different category from search. https://..."
 
+VOICE MODE:
+The user prompt will specify a voice mode for this particular post (e.g.
+"dryly_skeptical", "genuinely_impressed", "deadpan_factual",
+"reflective_contextual"). Lean into that mood while staying within the voice
+principles and hard bans above. The mode is per-post so the channel doesn't
+sound monotonous.
+
 OUTPUT RULES (CRITICAL):
 - Return ONLY a single raw JSON object.
 - Do NOT wrap the JSON in markdown code fences like ```json or ```.
@@ -183,7 +242,9 @@ class AIRewriter:
         reraise=True,
     )
     async def rewrite(self, item: NewsItem) -> Optional[PlatformVariants]:
-        user_prompt = self._build_user_prompt(item)
+        mode = pick_voice_mode(item.id)
+        log.info("rewriter_voice_mode", item_id=item.id, mode=mode["name"])
+        user_prompt = self._build_user_prompt(item, mode)
         raw = ""
         try:
             await get_llm_limiter().acquire()
@@ -207,8 +268,10 @@ class AIRewriter:
             )
             return None
 
-    def _build_user_prompt(self, item: NewsItem) -> str:
+    def _build_user_prompt(self, item: NewsItem, mode: dict[str, str]) -> str:
         return (
+            f"Voice mode for this post: {mode['name']}\n"
+            f"Mode guidance: {mode['description']}\n\n"
             f"Headline: {item.title}\n"
             f"Source: {item.source}\n"
             f"URL: {item.url}\n"
