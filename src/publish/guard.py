@@ -1,12 +1,17 @@
 """Per-platform publish guards.
 
-Before each adapter publish call, two checks are applied:
+Before each adapter publish call, three checks are applied:
 
 1. Daily cap: how many successful posts have we made to this platform today
    (UTC midnight reset)? If we're already at or above the configured limit,
    skip.
 2. Min interval: how long since our last successful post to this platform?
    If less than the configured minimum, skip.
+3. Jitter: an extra 0..jitter_max minutes is added to the min interval per
+   post, seeded by the previous post's timestamp so the same input gives
+   the same answer (retries are stable). This makes the actual gap between
+   posts vary instead of being exactly N minutes every time, which is the
+   biggest "this is a bot" tell to anti-spam classifiers.
 
 Both checks read the existing `posts` table — no schema migration required.
 A "successful post" is `posts.status == 'posted'`.
@@ -17,6 +22,7 @@ items just don't post until tomorrow's cap resets.
 """
 from __future__ import annotations
 
+import random
 from datetime import datetime, timedelta
 from typing import NamedTuple
 
@@ -37,13 +43,44 @@ class GuardResult(NamedTuple):
     reason: str  # empty when allowed; human-readable when blocked
 
 
-# Maps platform name to (daily_cap_attr, min_interval_attr) on Settings.
-_PLATFORM_CONFIG: dict[str, tuple[str, str]] = {
-    "telegram": ("telegram_daily_post_limit", "telegram_min_interval_min"),
-    "threads": ("threads_daily_post_limit", "threads_min_interval_min"),
-    "x": ("x_daily_post_limit", "x_min_interval_min"),
-    "youtube": ("youtube_daily_post_limit", "youtube_min_interval_min"),
+# Maps platform name to (daily_cap_attr, min_interval_attr, jitter_attr).
+_PLATFORM_CONFIG: dict[str, tuple[str, str, str]] = {
+    "telegram": (
+        "telegram_daily_post_limit",
+        "telegram_min_interval_min",
+        "telegram_jitter_min",
+    ),
+    "threads": (
+        "threads_daily_post_limit",
+        "threads_min_interval_min",
+        "threads_jitter_min",
+    ),
+    "x": (
+        "x_daily_post_limit",
+        "x_min_interval_min",
+        "x_jitter_min",
+    ),
 }
+
+
+def _effective_interval_minutes(
+    base_min: int, jitter_max: int, last_posted_at: datetime
+) -> float:
+    """Return min_interval plus a deterministic random 0..jitter_max minutes.
+
+    Seeded on `last_posted_at` so the same previous-post timestamp always
+    yields the same effective interval. This means:
+      - Retries of the guard get the same answer (idempotent).
+      - Successive posts get different intervals (different seeds), breaking
+        the clockwork pattern.
+    """
+    if jitter_max <= 0:
+        return float(base_min)
+    # Seed with the last post's microsecond-precision timestamp.
+    # Using timestamp() (float) preserves precision better than int().
+    seed = last_posted_at.timestamp()
+    rng = random.Random(seed)
+    return base_min + rng.uniform(0, jitter_max)
 
 
 def can_publish(platform: str, session: Session, now: datetime | None = None) -> GuardResult:
@@ -55,9 +92,10 @@ def can_publish(platform: str, session: Session, now: datetime | None = None) ->
     if platform not in _PLATFORM_CONFIG:
         return GuardResult(True, "")
 
-    cap_attr, interval_attr = _PLATFORM_CONFIG[platform]
+    cap_attr, interval_attr, jitter_attr = _PLATFORM_CONFIG[platform]
     daily_cap: int = getattr(settings, cap_attr)
     min_interval_min: int = getattr(settings, interval_attr)
+    jitter_max_min: int = getattr(settings, jitter_attr, 0)
 
     now = now or datetime.utcnow()
 
@@ -76,7 +114,8 @@ def can_publish(platform: str, session: Session, now: datetime | None = None) ->
                 False, f"daily cap reached ({daily_count}/{daily_cap})"
             )
 
-    # Check 2: min interval since last successful post (0 = no interval check)
+    # Check 2: min interval (with optional deterministic jitter) since last
+    # successful post. 0 = no interval check.
     if min_interval_min > 0:
         last_posted_at = session.execute(
             select(func.max(Post.posted_at)).where(
@@ -85,16 +124,19 @@ def can_publish(platform: str, session: Session, now: datetime | None = None) ->
             )
         ).scalar()
         if last_posted_at is not None:
+            effective_min = _effective_interval_minutes(
+                min_interval_min, jitter_max_min, last_posted_at
+            )
             elapsed = now - last_posted_at
-            min_interval = timedelta(minutes=min_interval_min)
-            if elapsed < min_interval:
+            effective_interval = timedelta(minutes=effective_min)
+            if elapsed < effective_interval:
                 elapsed_min = elapsed.total_seconds() / 60
-                remaining_min = (min_interval - elapsed).total_seconds() / 60
+                remaining_min = (effective_interval - elapsed).total_seconds() / 60
                 return GuardResult(
                     False,
                     f"min interval not met "
                     f"(last post {elapsed_min:.1f}min ago, "
-                    f"need {min_interval_min}min, "
+                    f"need {effective_min:.0f}min, "
                     f"{remaining_min:.1f}min remaining)",
                 )
 

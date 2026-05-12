@@ -32,25 +32,29 @@ class Settings(BaseSettings):
     # Items below threshold are dropped before the LLM, saving cost.
     breaking_filter_threshold: float = 0.5
 
-    # Per-platform publish guards. Two checks are applied before each post:
+    # Per-platform publish guards. Three checks are applied before each post:
     #
     # 1. Daily cap: max posts allowed per UTC day (0 = unlimited).
     # 2. Min interval: minimum minutes between consecutive posts to the same
     #    platform (0 = no interval check).
+    # 3. Jitter: random extra minutes added to the min interval per post,
+    #    seeded by the previous post's timestamp so the result is
+    #    deterministic but varies post-to-post. Eliminates the clockwork
+    #    cadence that anti-spam classifiers flag. 0 = no jitter.
     #
-    # When either check fails, the item is skipped for that platform but still
+    # Effective interval each post: min_interval + random.uniform(0, jitter)
+    #
+    # When any check fails, the item is skipped for that platform but still
     # publishes to other enabled platforms whose guards allow it.
-    #
-    # Defaults reflect a brand-new account warming phase. Raise after 30 days
-    # of clean operation when the algorithm has classified you as legitimate.
     telegram_daily_post_limit: int = 30
     telegram_min_interval_min: int = 20
+    telegram_jitter_min: int = 8
     threads_daily_post_limit: int = 10
     threads_min_interval_min: int = 90
+    threads_jitter_min: int = 30
     x_daily_post_limit: int = 8
     x_min_interval_min: int = 90
-    youtube_daily_post_limit: int = 3
-    youtube_min_interval_min: int = 240
+    x_jitter_min: int = 30
 
     # Sources
     rss_feeds: str = ""
@@ -71,18 +75,10 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     telegram_channel_id: str = ""
 
-    # YouTube
-    youtube_client_id: str = ""
-    youtube_client_secret: str = ""
-    youtube_refresh_token: str = ""
-    elevenlabs_api_key: str = ""
-    pexels_api_key: str = ""
-
     # Feature flags
     enable_x: bool = True
     enable_threads: bool = False
     enable_telegram: bool = True
-    enable_youtube: bool = False
     dry_run: bool = True
 
     @property
@@ -95,7 +91,6 @@ class Settings(BaseSettings):
             "x": self.enable_x,
             "threads": self.enable_threads,
             "telegram": self.enable_telegram,
-            "youtube": self.enable_youtube,
         }
         return [name for name, on in flags.items() if on]
 
