@@ -1,5 +1,13 @@
-"""X (Twitter) adapter using tweepy v4's async client."""
+"""X (Twitter) adapter using tweepy v4's async client.
+
+URL stripping: X charges $0.20 per post containing a URL vs $0.015 for plain
+text posts (a 13x premium intended to discourage off-platform links). We
+prompt the LLM to omit URLs from the x variant, but as a defense in depth
+this adapter strips any URL that slips through before posting.
+"""
 from __future__ import annotations
+
+import re
 
 import tweepy
 
@@ -8,6 +16,23 @@ from src.config import settings
 from src.utils.logger import get_logger
 
 log = get_logger(__name__)
+
+# Matches http(s) URLs and t.co shortened ones. Anchored to whitespace
+# boundaries so partial text matches don't get destroyed.
+_URL_PATTERN = re.compile(r"https?://\S+|t\.co/\S+", re.IGNORECASE)
+
+
+def _strip_urls(text: str) -> tuple[str, int]:
+    """Remove any URLs from text. Returns (cleaned_text, count_removed)."""
+    matches = _URL_PATTERN.findall(text)
+    if not matches:
+        return text, 0
+    cleaned = _URL_PATTERN.sub("", text)
+    # Collapse the whitespace gap left behind by the removed URL.
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+    # Remove dangling trailing punctuation left over from "... read more: <URL>"
+    cleaned = re.sub(r"[\s:,;\-—–]+$", "", cleaned)
+    return cleaned, len(matches)
 
 
 class XAdapter(BaseAdapter):
@@ -28,12 +53,19 @@ class XAdapter(BaseAdapter):
         return self._client
 
     async def publish(self, content: str) -> AdapterResult:
+        # Defense in depth: strip any URL before posting. The prompt tells the
+        # LLM to omit URLs, but if one slips through we don't want to be billed
+        # at the URL-post rate (13x more expensive).
+        text, stripped = _strip_urls(content)
+        if stripped:
+            log.info("x_url_stripped", count=stripped, preview=text[:80])
+
         if settings.dry_run:
-            log.info("x_dry_run", preview=content[:80])
+            log.info("x_dry_run", preview=text[:80])
             return AdapterResult(ok=True, platform_post_id="dryrun")
 
         # Truncate safety net
-        text = content[:280]
+        text = text[:280]
         try:
             import asyncio
 

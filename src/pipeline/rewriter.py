@@ -1,7 +1,8 @@
 """AI Rewriter - the brain of the pipeline.
 
 One LLM call takes a news item and returns a JSON object with platform-specific
-variants. This is the central cost-saver: we generate all outputs from one call.
+variants (x, threads, telegram). This is the central cost-saver: we generate
+all outputs from one call.
 """
 from __future__ import annotations
 
@@ -76,14 +77,12 @@ class PlatformVariants:
     x: str
     threads: str
     telegram: str
-    youtube_script: str
 
     def to_dict(self) -> dict[str, str]:
         return {
             "x": self.x,
             "threads": self.threads,
             "telegram": self.telegram,
-            "youtube": self.youtube_script,
         }
 
 
@@ -129,23 +128,26 @@ DO:
 - Surface specific numbers when they're in the source (price, %, benchmark).
 - Notice the framing nobody else is mentioning. The interesting story is often
   not the headline.
-- Include the source link at the end of x and threads variants.
+- Source attribution:
+  - threads, telegram: include the source URL at the end of the post.
+  - x: NEVER include any URL (X charges $0.20 per URL post vs $0.015 without
+    AND penalises link posts algorithmically). Instead, name the source in
+    plain text, e.g. "(via Anthropic)" or "TechCrunch reports …".
 - Never fabricate facts, version numbers, prices, or benchmark scores not in
   the input. If a number isn't in the source, don't invent one.
 
 Per-platform constraints:
-- x: 270 chars max. Punchy. Often leaves you wanting more.
+- x: 270 chars max. Punchy. Often leaves you wanting more. NO URLs - name the
+  source in plain text instead (e.g. "(via TechCrunch)" or "Anthropic just …").
 - threads: 480 chars max. Conversational tone. Aim for 60-80% of the limit -
-  tighter posts perform better.
+  tighter posts perform better. End with source URL.
 - telegram: 800 chars max. Markdown for *bold* key verbs/products. Prose, not
-  bullets, unless content is truly enumerable. End with source link.
-- youtube_script: ~40 words for a 15-sec spoken script. Hook in 3 seconds.
-  Spell out numbers ("seventeen-forty-nine" not "$1,749") for TTS.
+  bullets, unless content is truly enumerable. End with source URL.
 
 EXAMPLE 1
 Source headline: "Anthropic releases Claude 4 with 200k context window, 50% faster"
 
-BAD (templated AI):
+BAD x variant (templated AI, includes URL):
 "🚨 **Major announcement from Anthropic!**
 Key points:
 • Claude 4 released
@@ -154,29 +156,31 @@ Key points:
 Builder angle: This unlocks new agent workflows.
 What do you think? 👇 https://..."
 
-GOOD (human):
-"Anthropic shipped Claude 4. The benchmarks are nice, but the actually
-interesting bit: 50% faster at the same price tier finally puts agent loops
-in the 'cheap enough to run all day' zone. Claude 3.5 felt like a research
-preview. This feels like infrastructure. https://..."
+GOOD x variant (human, NO URL, source named in text):
+"Anthropic shipped Claude 4. Benchmarks are nice, but the actually interesting
+bit: 50% faster at the same price tier finally puts agent loops in the 'cheap
+enough to run all day' zone. Claude 3.5 felt like a research preview. This
+feels like infrastructure."
+
+GOOD threads variant (URL included at end):
+"Anthropic shipped Claude 4 with 200k context. The benchmarks are nice but the
+actually interesting bit: 50% faster at the same price tier finally puts agent
+loops in the 'cheap enough to run all day' zone. https://anthropic.com/..."
 
 EXAMPLE 2
 Source headline: "Cursor raises $200M Series C at $9B valuation"
 
-BAD (templated AI):
-"💰 **Cursor raises $200M Series C**
-Key points:
-• $9B valuation
-• Led by a16z
-• Plans to expand team
-Builder angle: AI coding tools are the future.
-Thoughts? 🚀 https://..."
+GOOD x variant (NO URL, source named in text):
+"Cursor raised $200M at $9B per TechCrunch. Two years ago they were a side
+project. Now they're worth more than Stripe was at the same age. Bear case
+used to be 'GitHub will copy this'. Bull case is now: maybe coding tools are
+just a genuinely different category from search."
 
-GOOD (human):
+GOOD threads variant (URL included at end):
 "Cursor raised $200M at $9B. Two years ago they were a side project. Now
 they're worth more than Stripe was at the same age. The bear case used to be
 'GitHub will copy this'. Bull case is now: maybe coding tools are just a
-genuinely different category from search. https://..."
+genuinely different category from search. https://techcrunch.com/..."
 
 VOICE MODE:
 The user prompt will specify a voice mode for this particular post (e.g.
@@ -192,8 +196,7 @@ OUTPUT RULES (CRITICAL):
 - Do NOT include comments inside the JSON.
 - Use double quotes, not single quotes.
 
-The JSON must have exactly these four keys: "x", "threads", "telegram",
-"youtube_script".
+The JSON must have exactly these three keys: "x", "threads", "telegram".
 """
 
 
@@ -255,7 +258,6 @@ class AIRewriter:
                 x=parsed["x"],
                 threads=parsed["threads"],
                 telegram=parsed["telegram"],
-                youtube_script=parsed["youtube_script"],
             )
         except (json.JSONDecodeError, KeyError) as e:
             # Log a short preview of the offending response to make this debuggable.
